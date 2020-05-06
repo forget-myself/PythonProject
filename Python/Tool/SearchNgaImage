@@ -1,0 +1,130 @@
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+import urllib.request
+headers={
+    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+    'Connection':'keep-alive'
+}
+
+cookies='UM_distinctid=16eedd75b58642-0e4c9dd250057a-32365f08-1fa400-16eedd75b5979e; taihe_bi_sdk_uid=e211ee74f57916ab6f578997e4017c64; taihe_bi_sdk_session=279a24ba029d736223022c14c4f0b304; ngacn0comUserInfo=%25B7%25E7Nuts%09%25E9%25A3%258ENuts%0939%0939%09%0911%0943602%094%090%090%0919_15%2C61_19%2C67_45%2C87_15; ngaPassportUid=34982491; ngaPassportUrlencodedUname=%25B7%25E7Nuts; ngaPassportCid=Z8f21rkjck7d4fit5ndjjltdmgl2qab6opo7ddgi; lastvisit=1586586529; lastpath=/thread.php?fid=-7; ngacn0comUserInfoCheck=829aee64008646527deca73717bed315; ngacn0comInfoCheckTime=1586586529; bbsmisccookies=%7B%22pv_count_for_insad%22%3A%7B0%3A-43%2C1%3A1586624426%7D%2C%22insad_views%22%3A%7B0%3A1%2C1%3A1586624426%7D%2C%22uisetting%22%3A%7B0%3A%22a%22%2C1%3A1586586818%7D%7D; CNZZDATA30043604=cnzz_eid%3D1863004508-1575948152-%26ntime%3D1586581294; _cnzz_CV30043604=forum%7Cfid-7%7C0'
+cookie={}
+for line in cookies.split(';'):
+    name,value=line.strip().split('=',1)
+    cookie[name]=value
+
+urls=['https://bbs.nga.cn/thread.php?fid=-7&page=',
+      'https://bbs.nga.cn/thread.php?fid=436&page='
+      ]
+
+
+#获取内容里的img标签
+def parseContent(content):
+    pattern = "\[img](.*?)\[/img]"
+    result = re.findall(pattern, content)
+    return result
+
+#获取指定页数的主题
+def getTopic(url,number=1):
+    topics = []
+    for i in range(1,number+1):
+        url_one=url+str(i)
+        res=requests.get(url_one,cookies=cookie,headers=headers)
+        soup=BeautifulSoup(res.content,'lxml')
+        topic=soup.find_all('a',class_='topic')
+        for t in topic:
+            topics.append('https://bbs.nga.cn/'+t['href']+"  "+t.get_text())
+    return topics
+
+
+#def saveImage(url):
+
+imageNum=0
+
+def showUrl(oneUrl) :
+    if oneUrl.startswith('http') == False:
+        oneUrl = 'https://img.nga.178.com/attachments'+oneUrl.strip( '.' )
+    #print(oneUrl[-15:])
+    #print(oneUrl[-15:].replace('\/',''))
+    global imageNum
+    urllib.request.urlretrieve(oneUrl, 'I:/pythonImage/Image/ops_'+str(imageNum) + oneUrl[-10:].replace('\\',''))
+    imageNum+=1
+    print(imageNum)
+
+#获取指定主题的内容
+def getContext(url):
+    print("url: ",url)
+    res=requests.get(url,cookies=cookie,headers=headers)
+    soup=BeautifulSoup(res.content,'lxml')
+    title_body = soup.find_all('p', class_='postcontent ubbcode')
+    count =0
+    res.encoding = res.apparent_encoding
+    print("headers: ", res.request)
+    for t in title_body:
+        count+=1
+    context = soup.find_all('span', class_="postcontent ubbcode")
+    for c in context:
+        #print('get_text',c.get_text())
+        #print('cc', c)
+        urls = parseContent(c.get_text())
+        #print(urls)
+        if len(urls)>0:
+            for k in range(len(urls )):
+                showUrl(urls[k])
+
+    soup2 = BeautifulSoup(res.headers, 'lxml')
+    table_body = soup2.find_all('div', class_='left')
+    print(table_body)
+    #for e in table_body:
+    #    print('ee ',e)
+    #images = soup.find('img')
+   # print('-------------------------------------------')
+  #  print(soup.prettify())
+   # for c in images:
+    #    print(c.get_text())
+    '''
+    for child in soup.body:
+        print(child)
+        print('------------------')
+    print('-------------------------------------------')
+'''
+def getTheme(index,big_topic,page_num):
+    if (index == -1):
+        Topic = getTopic(urls[big_topic - 1], page_num)
+        for i in range(1, len(Topic)):
+            print(str(i) + " " + Topic[i - 1])
+        index = int(input(""))
+    #getTheme(   index,big_topic,page_num)
+
+page_num=0
+def getPageNum(page):
+    page+=1
+    if page>2 :
+        page=1
+    return page
+
+if __name__ == '__main__':
+   big_topic=1
+   page_num = getPageNum(page_num)
+   Topic=getTopic(urls[big_topic-1],page_num)
+   print(len(Topic),page_num)
+   opsnum = 0
+   '''
+   #打印所有的帖子标题
+   for i in range(1,len(Topic)):
+       print(str(i)+" "+Topic[i-1])
+       '''
+   for i in range(2):
+       for j in range(1,len(Topic)):
+           top_id=j
+           getTheme(top_id,big_topic,page_num)
+           url_next=Topic[top_id-1].split(" ")[0]
+           # 打印链接和标题
+           #print(url_next)
+           print("url_next",url_next,Topic[top_id - 1],top_id)
+           getContext(url_next)
+           #print(len(Topic))
+           time.sleep(1)
+
+
