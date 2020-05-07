@@ -40,55 +40,52 @@ def getTopic(url,number=1):
 
 #def saveImage(url):
 
-imageNum=0
 
+imageNum=0
 def showUrl(oneUrl) :
     if oneUrl.startswith('http') == False:
         oneUrl = 'https://img.nga.178.com/attachments'+oneUrl.strip( '.' )
     #print(oneUrl[-15:])
-    #print(oneUrl[-15:].replace('\/',''))
+    #print(oneUrl[-15:].replace(r'/',''))
     global imageNum
-    urllib.request.urlretrieve(oneUrl, 'I:/pythonImage/Image/ops_'+str(imageNum) + oneUrl[-10:].replace('\\',''))
+    a = oneUrl[-15:].replace(r'/','')
+    print(a)
+    urllib.request.urlretrieve(oneUrl, 'I:/pythonImage/Image/ops_'+str(imageNum) + a)
     imageNum+=1
     print(imageNum)
 
 #获取指定主题的内容
 def getContext(url):
-    print("url: ",url)
+    #print("url: ",url)
     res=requests.get(url,cookies=cookie,headers=headers)
+    #print("content: ",res.content)
     soup=BeautifulSoup(res.content,'lxml')
     title_body = soup.find_all('p', class_='postcontent ubbcode')
     count =0
-    res.encoding = res.apparent_encoding
-    print("headers: ", res.request)
     for t in title_body:
+        if count<3:
+            print(t.strings)
+        elif count == len(title_body)-1 :
+            print(t.strings)
         count+=1
     context = soup.find_all('span', class_="postcontent ubbcode")
     for c in context:
-        #print('get_text',c.get_text())
-        #print('cc', c)
         urls = parseContent(c.get_text())
-        #print(urls)
         if len(urls)>0:
             for k in range(len(urls )):
                 showUrl(urls[k])
+    global totalPageNum
+    if totalPageNum == 1:
+        res.encoding = res.apparent_encoding
+        soup2 = BeautifulSoup(res.content, 'html.parser')
+        table_body = soup2.find_all(id='m_pbtnbtm')
+        for th in table_body:
+            th_all22 = th.find_all('script')
+            # print(th_all22)
+            if len(th_all22) == 2:
+                totalPageNum = int(re.split(r'[:,]', str(th_all22[1]))[3])  # 多字符分隔（;或者,）
+                print('有几页 ', totalPageNum)
 
-    soup2 = BeautifulSoup(res.headers, 'lxml')
-    table_body = soup2.find_all('div', class_='left')
-    print(table_body)
-    #for e in table_body:
-    #    print('ee ',e)
-    #images = soup.find('img')
-   # print('-------------------------------------------')
-  #  print(soup.prettify())
-   # for c in images:
-    #    print(c.get_text())
-    '''
-    for child in soup.body:
-        print(child)
-        print('------------------')
-    print('-------------------------------------------')
-'''
 def getTheme(index,big_topic,page_num):
     if (index == -1):
         Topic = getTopic(urls[big_topic - 1], page_num)
@@ -104,27 +101,38 @@ def getPageNum(page):
         page=1
     return page
 
+currPageNum=1
+totalPageNum=1
+
 if __name__ == '__main__':
    big_topic=1
    page_num = getPageNum(page_num)
    Topic=getTopic(urls[big_topic-1],page_num)
-   print(len(Topic),page_num)
+   #print(len(Topic),page_num)
    opsnum = 0
    '''
    #打印所有的帖子标题
    for i in range(1,len(Topic)):
        print(str(i)+" "+Topic[i-1])
        '''
-   for i in range(2):
+   for i in range(1000):
        for j in range(1,len(Topic)):
            top_id=j
            getTheme(top_id,big_topic,page_num)
            url_next=Topic[top_id-1].split(" ")[0]
            # 打印链接和标题
-           #print(url_next)
-           print("url_next",url_next,Topic[top_id - 1],top_id)
-           getContext(url_next)
-           #print(len(Topic))
-           time.sleep(1)
+           print("url_next",url_next)
+           while currPageNum <= totalPageNum:
+               if currPageNum>1:
+                   url_next += r'&page='+ str(currPageNum)
+                   print("url_next2", url_next)
+               getContext(url_next)
+               currPageNum += 1
+               time.sleep(2)
+           currPageNum=1
+           totalPageNum=1
+
+
+
 
 
