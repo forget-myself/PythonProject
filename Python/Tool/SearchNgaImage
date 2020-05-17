@@ -3,77 +3,126 @@ import requests
 import time
 import re
 import urllib.request
-headers={
-    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
-    'Connection':'keep-alive'
+import copy
+import openpyxl
+import pathlib
+import os
+from openpyxl import Workbook
+from urllib.request import urlopen
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+    'Connection': 'keep-alive'
 }
 
-cookies='UM_distinctid=16eedd75b58642-0e4c9dd250057a-32365f08-1fa400-16eedd75b5979e; taihe_bi_sdk_uid=e211ee74f57916ab6f578997e4017c64; taihe_bi_sdk_session=279a24ba029d736223022c14c4f0b304; ngacn0comUserInfo=%25B7%25E7Nuts%09%25E9%25A3%258ENuts%0939%0939%09%0911%0943602%094%090%090%0919_15%2C61_19%2C67_45%2C87_15; ngaPassportUid=34982491; ngaPassportUrlencodedUname=%25B7%25E7Nuts; ngaPassportCid=Z8f21rkjck7d4fit5ndjjltdmgl2qab6opo7ddgi; lastvisit=1586586529; lastpath=/thread.php?fid=-7; ngacn0comUserInfoCheck=829aee64008646527deca73717bed315; ngacn0comInfoCheckTime=1586586529; bbsmisccookies=%7B%22pv_count_for_insad%22%3A%7B0%3A-43%2C1%3A1586624426%7D%2C%22insad_views%22%3A%7B0%3A1%2C1%3A1586624426%7D%2C%22uisetting%22%3A%7B0%3A%22a%22%2C1%3A1586586818%7D%7D; CNZZDATA30043604=cnzz_eid%3D1863004508-1575948152-%26ntime%3D1586581294; _cnzz_CV30043604=forum%7Cfid-7%7C0'
-cookie={}
+cookies = 'UM_distinctid=16eedd75b58642-0e4c9dd250057a-32365f08-1fa400-16eedd75b5979e; taihe_bi_sdk_uid=e211ee74f57916ab6f578997e4017c64; taihe_bi_sdk_session=279a24ba029d736223022c14c4f0b304; ngacn0comUserInfo=%25B7%25E7Nuts%09%25E9%25A3%258ENuts%0939%0939%09%0911%0943602%094%090%090%0919_15%2C61_19%2C67_45%2C87_15; ngaPassportUid=34982491; ngaPassportUrlencodedUname=%25B7%25E7Nuts; ngaPassportCid=Z8f21rkjck7d4fit5ndjjltdmgl2qab6opo7ddgi; lastvisit=1586586529; lastpath=/thread.php?fid=-7; ngacn0comUserInfoCheck=829aee64008646527deca73717bed315; ngacn0comInfoCheckTime=1586586529; bbsmisccookies=%7B%22pv_count_for_insad%22%3A%7B0%3A-43%2C1%3A1586624426%7D%2C%22insad_views%22%3A%7B0%3A1%2C1%3A1586624426%7D%2C%22uisetting%22%3A%7B0%3A%22a%22%2C1%3A1586586818%7D%7D; CNZZDATA30043604=cnzz_eid%3D1863004508-1575948152-%26ntime%3D1586581294; _cnzz_CV30043604=forum%7Cfid-7%7C0'
+cookie = {}
 for line in cookies.split(';'):
-    name,value=line.strip().split('=',1)
-    cookie[name]=value
+    name, value = line.strip().split('=', 1)
+    cookie[name] = value
 
-urls=['https://bbs.nga.cn/thread.php?fid=-7&page=',
-      'https://bbs.nga.cn/thread.php?fid=436&page='
-      ]
+urls = ['https://bbs.nga.cn/thread.php?fid=-7&page=',
+        'https://bbs.nga.cn/thread.php?fid=436&page='
+        ]
 
 
-#获取内容里的img标签
+# 获取内容里的img标签
 def parseContent(content):
     pattern = "\[img](.*?)\[/img]"
     result = re.findall(pattern, content)
     return result
 
-#获取指定页数的主题
-def getTopic(url,number=1):
+
+# 获取指定页数的主题
+def getTopic(url, number=1):
     topics = []
-    for i in range(1,number+1):
-        url_one=url+str(i)
-        res=requests.get(url_one,cookies=cookie,headers=headers)
-        soup=BeautifulSoup(res.content,'lxml')
-        topic=soup.find_all('a',class_='topic')
+    for i in range(1, number + 1):
+        url_one = url + str(i)
+        res = requests.get(url_one, cookies=cookie, headers=headers,timeout = 5000)
+        soup = BeautifulSoup(res.content, 'lxml')
+        topic = soup.find_all('a', class_='topic')
         for t in topic:
-            topics.append('https://bbs.nga.cn/'+t['href']+"  "+t.get_text())
+            topics.append('https://bbs.nga.cn/' + t['href'] + "  " + t.get_text())
     return topics
 
 
-#def saveImage(url):
+# def saveImage(url):
 
 
-imageNum=0
-def showUrl(oneUrl) :
+imageNum = 0
+imageNum = 0
+isdownload = False
+
+def loading(blocknum,blocksize,totalsize):
+    percent=blocknum*blocksize/totalsize
+    global isdownload
+    #print(isdownload,totalsize,blocknum,blocksize)
+    if percent>1.0:
+        isdownload =True
+        #print('isdown    ')
+
+def showUrl(oneUrl,orUrl):
     if oneUrl.startswith('http') == False:
-        oneUrl = 'https://img.nga.178.com/attachments'+oneUrl.strip( '.' )
-    #print(oneUrl[-15:])
-    #print(oneUrl[-15:].replace(r'/',''))
+        oneUrl = 'https://img.nga.178.com/attachments' + oneUrl.strip('.')
+    # print(oneUrl[-15:])
+    # print(oneUrl[-15:].replace(r'/',''))
     global imageNum
-    a = oneUrl[-15:].replace(r'/','')
-    print(a)
-    urllib.request.urlretrieve(oneUrl, 'I:/pythonImage/Image/ops_'+str(imageNum) + a)
-    imageNum+=1
-    print(imageNum)
+    a = oneUrl[-25:].replace(r'/', '')
+    global isdownload
+    if a not in imageDic:
+        isdownload = False
+        imageDic.append(a)
+        try:
+            urllib.request.urlretrieve(oneUrl, oriPath+r"\\" + a,reporthook=loading)
+        except:
+            print('aaa')
+            isdownload = True
+        saveExcel(a,oneUrl,orUrl)
+        #print('isdownload  ', isdownload)
+        while isdownload == False:
+            print('wait down')
+            time.sleep(0.5)
+        imageNum += 1
+    else:
+        a = oneUrl[-30:].replace(r'/', '')
+        imageDic.append(a)
+        try:
+            urllib.request.urlretrieve(oneUrl, oriPath +r"\\"+ a,reporthook=loading)
+        except:
+            print('aaa')
+            isdownload = True
+        saveExcel(a, oneUrl,orUrl)
+        while isdownload == False:
+            print('wait down')
+            time.sleep(1)
+        imageNum += 1
 
-#获取指定主题的内容
+def saveExcel(imageName,url,orUrl):
+    rows = ws.max_row
+    ws.cell(row= rows+1,column= 1).value = imageName
+    ws.cell(row= rows + 1,column= 2).value = url
+    ws.cell(row=rows + 1, column=3).value = orUrl
+    #ws.save(r'I:\pythonImage\source.xlsx')
+    #print(type(ws))
+    inwb.save(excelPath)
+
+# 获取指定主题的内容
 def getContext(url):
-    #print("url: ",url)
-    res=requests.get(url,cookies=cookie,headers=headers)
-    #print("content: ",res.content)
-    soup=BeautifulSoup(res.content,'lxml')
+    # print("url: ",url)
+    res = requests.get(url, cookies=cookie, headers=headers)
+    # print("content: ",res.content)
+    soup = BeautifulSoup(res.content, 'lxml')
     title_body = soup.find_all('p', class_='postcontent ubbcode')
-    count =0
+    count = 0
     for t in title_body:
-        if count<3:
+        if count == len(title_body) - 1:
             print(t.strings)
-        elif count == len(title_body)-1 :
-            print(t.strings)
-        count+=1
+        count += 1
     context = soup.find_all('span', class_="postcontent ubbcode")
     for c in context:
         urls = parseContent(c.get_text())
-        if len(urls)>0:
-            for k in range(len(urls )):
-                showUrl(urls[k])
+        if len(urls) > 0:
+            for k in range(len(urls)):
+                showUrl(urls[k],url)
     global totalPageNum
     if totalPageNum == 1:
         res.encoding = res.apparent_encoding
@@ -84,55 +133,81 @@ def getContext(url):
             # print(th_all22)
             if len(th_all22) == 2:
                 totalPageNum = int(re.split(r'[:,]', str(th_all22[1]))[3])  # 多字符分隔（;或者,）
-                print('有几页 ', totalPageNum)
+                if totalPageNum>30:
+                    totalPageNum = 30
+                    print('页数超过30，砍到30 ', totalPageNum)
+                else:
+                    print('页数 ', totalPageNum)
 
-def getTheme(index,big_topic,page_num):
+
+def getTheme(index, big_topic, page_num):
     if (index == -1):
         Topic = getTopic(urls[big_topic - 1], page_num)
         for i in range(1, len(Topic)):
             print(str(i) + " " + Topic[i - 1])
         index = int(input(""))
-    #getTheme(   index,big_topic,page_num)
+    # getTheme(   index,big_topic,page_num)
 
-page_num=0
+
+page_num = 0
+
+
 def getPageNum(page):
-    page+=1
-    if page>2 :
-        page=1
+    page += 1
+    if page > 4:
+        page = 1
     return page
 
-currPageNum=1
-totalPageNum=1
+
+currPageNum = 1
+totalPageNum = 5 #最大页数#
+imageDic =[]  #图片字典
+imageIndex= 10  #需要配置，当前图片路径索引
+ffName = r'\Image'+str(imageIndex)
+oriPath = r'I:\pythonImage'+ffName
+path = pathlib.Path(oriPath)
+if path.exists() == False:
+    os.mkdir(path)
+path = pathlib.Path(oriPath + r'\source.xlsx')
+if path.exists() == False:
+    ss = r'source.xlsx'
+    wb1 = Workbook()
+    ws2 = wb1.create_sheet(0)  # 插入在工作簿的第一个位置
+    wb1.save(oriPath + r'\source.xlsx')
+excelPath = oriPath + r'\source.xlsx'
+path = pathlib.Path(excelPath)
+inwb = openpyxl.load_workbook(excelPath)
+ws = inwb['Sheet']
 
 if __name__ == '__main__':
-   big_topic=1
-   page_num = getPageNum(page_num)
-   Topic=getTopic(urls[big_topic-1],page_num)
-   #print(len(Topic),page_num)
-   opsnum = 0
-   '''
-   #打印所有的帖子标题
-   for i in range(1,len(Topic)):
-       print(str(i)+" "+Topic[i-1])
-       '''
-   for i in range(1000):
-       for j in range(1,len(Topic)):
-           top_id=j
-           getTheme(top_id,big_topic,page_num)
-           url_next=Topic[top_id-1].split(" ")[0]
-           # 打印链接和标题
-           print("url_next",url_next)
-           while currPageNum <= totalPageNum:
-               if currPageNum>1:
-                   url_next += r'&page='+ str(currPageNum)
-                   print("url_next2", url_next)
-               getContext(url_next)
-               currPageNum += 1
-               time.sleep(2)
-           currPageNum=1
-           totalPageNum=1
-
-
-
+    big_topic = 1
+    # page_num = getPageNum(page_num)
+    # Topic=getTopic(urls[big_topic-1],page_num)
+    # print(len(Topic),page_num)
+    opsnum = 0
+    '''
+    #打印所有的帖子标题
+    for i in range(1,len(Topic)):
+        print(str(i)+" "+Topic[i-1])
+        '''
+    for i in range(100000):
+        page_num = getPageNum(page_num)
+        Topic = getTopic(urls[big_topic - 1], page_num)
+        for j in range(1, len(Topic)):
+            top_id = j
+            getTheme(top_id, big_topic, page_num)
+            url_next = Topic[top_id - 1].split(" ")[0]
+            # 打印链接和标题
+            print("url_next", url_next)
+            while currPageNum <= totalPageNum:
+                currUrl=copy.deepcopy(url_next)
+                if currPageNum > 1:
+                    currUrl += r'&page=' + str(currPageNum)
+                    print("url_next2", currUrl)
+                getContext(currUrl)
+                currPageNum += 1
+                time.sleep(4)
+            currPageNum = 1
+            totalPageNum = 1
 
 
