@@ -1,0 +1,159 @@
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+import copy
+
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+    'Connection': 'keep-alive'
+}
+
+cookies = 'UM_distinctid=16eedd75b58642-0e4c9dd250057a-32365f08-1fa400-16eedd75b5979e; taihe_bi_sdk_uid=e211ee74f57916ab6f578997e4017c64; taihe_bi_sdk_session=279a24ba029d736223022c14c4f0b304; ngacn0comUserInfo=%25B7%25E7Nuts%09%25E9%25A3%258ENuts%0939%0939%09%0911%0943602%094%090%090%0919_15%2C61_19%2C67_45%2C87_15; ngaPassportUid=34982491; ngaPassportUrlencodedUname=%25B7%25E7Nuts; ngaPassportCid=Z8f21rkjck7d4fit5ndjjltdmgl2qab6opo7ddgi; lastvisit=1586586529; lastpath=/thread.php?fid=-7; ngacn0comUserInfoCheck=829aee64008646527deca73717bed315; ngacn0comInfoCheckTime=1586586529; bbsmisccookies=%7B%22pv_count_for_insad%22%3A%7B0%3A-43%2C1%3A1586624426%7D%2C%22insad_views%22%3A%7B0%3A1%2C1%3A1586624426%7D%2C%22uisetting%22%3A%7B0%3A%22a%22%2C1%3A1586586818%7D%7D; CNZZDATA30043604=cnzz_eid%3D1863004508-1575948152-%26ntime%3D1586581294; _cnzz_CV30043604=forum%7Cfid-7%7C0'
+cookie = {}
+for line in cookies.split(';'):
+    name, value = line.strip().split('=', 1)
+    cookie[name] = value
+
+urls = ['https://bbs.nga.cn/thread.php?fid=-7&page=',
+        'https://bbs.nga.cn/thread.php?fid=436&page='
+        ]
+
+topics = []
+
+
+# 获取指定页数的主题
+def get_topic(url, number=1):
+    global topics
+    topics.clear()
+    for i in range(1, number + 1):
+        url_one = url + str(i)
+        res = requests.get(url_one, cookies=cookie, headers=headers)
+        soup = BeautifulSoup(res.content, 'lxml')
+        topic = soup.find_all('a', class_='topic')
+        for t in topic:
+            topics.append('https://bbs.nga.cn/' + t['href'] + "  " + t.get_text())
+    return topics
+
+
+# 获取指定主题的内容
+def get_context(url):
+    print("url: ", url)
+    res = requests.get(url, cookies=cookie, headers=headers)
+    #print("content: ", res.content)
+    soup = BeautifulSoup(res.content, 'lxml')
+
+    titles2 = soup.find_all(id="postcontent0",class_="postcontent ubbcode")
+    for c in titles2:
+        print(c.get_text())
+
+    context = soup.find_all('span', class_="postcontent ubbcode")
+    for c in context:
+        print(str(c['id']).replace("postcontent",''), c.get_text(),)
+
+    totalPageNum = 1
+    if totalPageNum == 1:
+        res.encoding = res.apparent_encoding
+        soup2 = BeautifulSoup(res.content, 'html.parser')
+        table_body = soup2.find_all(id='m_pbtnbtm')
+        for th in table_body:
+            th_all22 = th.find_all('script')
+            # print(th_all22)
+            if len(th_all22) == 2:
+                totalPageNum = int(re.split(r'[:,]', str(th_all22[1]))[3])  # 多字符分隔（;或者,）
+                if totalPageNum > 30:
+                    totalPageNum = 30
+                    print('页数超过30，砍到30 ', totalPageNum)
+                else:
+                    print('页数 ', totalPageNum)
+        currPageNum =2
+        while currPageNum <= totalPageNum:
+            currUrl = copy.deepcopy(url_next)
+            if currPageNum > 1:
+                currUrl += r'&page=' + str(currPageNum)
+                print("url_next2", currUrl)
+           # getContext(currUrl)
+                res3 = requests.get(currUrl, cookies=cookie, headers=headers)
+                soup3 = BeautifulSoup(res3.content, 'lxml')
+                context3 = soup3.find_all('span', class_="postcontent ubbcode")
+                print('----------------------------------------------------------------',currPageNum)
+                for c in context3:
+                    print(str(c['id']).replace("postcontent", ''), c.get_text(), )
+                currPageNum += 1
+
+
+    # images = soup.find('img')
+    # print('-------------------------------------------')
+    #  print(soup.prettify())
+    # for c in images:
+    #    print(c.get_text())
+    '''
+    for child in soup.body:
+        print(child)
+        print('------------------')
+    print('-------------------------------------------')
+'''
+
+
+def get_theme(index, big_topic, page_num):
+    if (index == -1):
+        global topics
+        topics.clear()
+        topics = get_topic(urls[big_topic - 1], page_num)
+        for i in range(1, len(topics)):
+            print(str(i) + " " + topics[i - 1], '\n')
+        index = int(input(""))
+    # getTheme(   index,big_topic,page_num)
+
+
+if __name__ == '__main__':
+    big_topic = int(input(''))
+    page_num = 1
+    topics = get_topic(urls[big_topic - 1], page_num)
+    print(len(topics))
+    top_id = 0
+
+    is_over = True
+    index = 1
+
+    while True:
+        leng = 0
+        for i in range(index, len(topics)):
+            print(str(i), str(topics[i - 1]),)
+            leng+=1
+            if leng >5:
+                pp = input("")
+                if str(pp).isspace() or len(pp)==0:
+                    if i+leng>= len(topics):
+                        index = -1
+                        break
+                    leng = 0
+                    continue
+                else:
+                    top_id = int(pp)
+                    break
+        if index == -1:
+            index = 1
+            topics.clear()
+            topics = get_topic(urls[big_topic - 1], page_num)
+        elif top_id == 0 and index+leng<len(topics):
+            index += leng
+        else:
+            index = top_id
+
+
+        if(index>=len(topics)):
+            index =1
+            top_id = 0
+            topics.clear()
+            topics = get_topic(urls[big_topic - 1], page_num)
+
+        if top_id != 0 :
+            get_theme(top_id, big_topic, page_num)
+
+            url_next = topics[top_id - 1].split(" ")[0]
+            print("url_next", url_next, topics[top_id - 1], top_id)
+            get_context(url_next)
+            print(len(topics))
+            time.sleep(2)
+            top_id = 0
